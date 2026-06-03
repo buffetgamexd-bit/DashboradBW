@@ -1087,3 +1087,31 @@ table.tablero tr:hover .row-actions {
   color: var(--paper-bright);
   border-color: var(--ink-800);
 }
+
+/* Detalles de Contrato en la Tabla */
+.cli-desc {
+  font-size: 11px;
+  color: var(--char);
+  margin-top: 5px;
+  line-height: 1.4;
+  max-width: 260px;
+}
+
+.cli-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.cli-date-info {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  color: var(--slate);
+  letter-spacing: 0.02em;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 5px;
+}

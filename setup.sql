@@ -57,6 +57,11 @@ CREATE TABLE clientes (
   -- Tipo de Pago
   tipo_pago TEXT DEFAULT 'Pago único',
 
+  -- Detalles de Contrato
+  fecha_inicio TEXT DEFAULT NULL,
+  vigencia TEXT DEFAULT NULL,
+  descripcion TEXT DEFAULT NULL,
+
   -- CTO Firmado
   cto_firmado_status TEXT DEFAULT 'empty',
   cto_firmado_dias INTEGER DEFAULT NULL,

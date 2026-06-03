@@ -154,6 +154,13 @@ function renderTable() {
     const tr = document.createElement('tr');
     tr.dataset.id = c.id;
 
+    let metaInfo = '';
+    if (c.fecha_inicio || c.vigencia) {
+      const dateStr = c.fecha_inicio ? formatDate(c.fecha_inicio) : '';
+      const vigStr = c.vigencia ? `(${c.vigencia})` : '';
+      metaInfo = `<span class="cli-date-info" title="Fecha de inicio y vigencia">📅 ${dateStr} ${vigStr}</span>`;
+    }
+
     tr.innerHTML = `
       <td>
         <div>
@@ -161,9 +168,13 @@ function renderTable() {
           ${c.notas_count > 0 ? `<span class="notes-pill"><span class="notes-icon">📝</span> NOTAS ${c.notas_count}</span>` : ''}
         </div>
         <span class="cli-sector">${esc(c.sector || '')}</span>
-        <span class="pay-badge ${c.tipo_pago === 'A plazos' ? 'plazos' : 'unico'}" onclick="toggleTipoPago('${c.id}')" title="Haga click para cambiar el tipo de pago">
-          ${esc(c.tipo_pago || 'Pago único')}
-        </span>
+        ${c.descripcion ? `<p class="cli-desc">${esc(c.descripcion)}</p>` : ''}
+        <div class="cli-meta-row">
+          <span class="pay-badge ${c.tipo_pago === 'A plazos' ? 'plazos' : 'unico'}" onclick="toggleTipoPago('${c.id}')" title="Haga click para cambiar el tipo de pago">
+            ${esc(c.tipo_pago || 'Pago único')}
+          </span>
+          ${metaInfo}
+        </div>
         <div class="row-actions">
           <button class="ra-del" onclick="deleteCliente('${c.id}')" title="Eliminar cliente">✕ Eliminar</button>
         </div>
@@ -571,10 +582,13 @@ function closeModal() {
 
 async function handleSave() {
   const nombre = document.getElementById('f-nombre').value.trim();
-  const sector = document.getElementById('f-sector').value;
+  const sector = document.getElementById('f-sector').value.trim();
   const responsable = document.getElementById('f-responsable').value;
   const monto  = parseFloat(document.getElementById('f-monto').value) || 0;
   const tipo_pago = document.getElementById('f-tipo-pago').value || 'Pago único';
+  const fecha_inicio = document.getElementById('f-fecha-inicio').value || null;
+  const vigencia = document.getElementById('f-vigencia').value.trim() || null;
+  const descripcion = document.getElementById('f-descripcion').value.trim() || null;
 
   // Validation
   if (!nombre) {
@@ -594,6 +608,9 @@ async function handleSave() {
     responsable,
     notas_count: 0,
     tipo_pago,
+    fecha_inicio,
+    vigencia,
+    descripcion,
     e1_status: monto > 0 ? 'closed' : 'empty',
     e1_monto: monto,
     e2_status: 'empty',
@@ -770,6 +787,16 @@ async function handleDocumentUpload(e) {
       }
     }
 
+    if (data.fecha_inicio) {
+      document.getElementById('f-fecha-inicio').value = data.fecha_inicio;
+    }
+    if (data.vigencia) {
+      document.getElementById('f-vigencia').value = data.vigencia;
+    }
+    if (data.descripcion) {
+      document.getElementById('f-descripcion').value = data.descripcion;
+    }
+
     if (statusText) {
       statusText.className = 'doc-status success';
       statusText.textContent = '¡Documento leído! Campos completados con éxito.';
@@ -869,4 +896,21 @@ function toast(msg, type = 'success') {
     el.style.animation = 'toastOut 0.3s ease-out forwards';
     setTimeout(() => el.remove(), 300);
   }, 3500);
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  try {
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+      const day = parts[2];
+      const month = months[parseInt(parts[1]) - 1];
+      const year = parts[0];
+      return `${day}/${month}/${year}`;
+    }
+    return dateStr;
+  } catch (e) {
+    return dateStr;
+  }
 }
