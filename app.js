@@ -154,18 +154,11 @@ function renderTable() {
     const tr = document.createElement('tr');
     tr.dataset.id = c.id;
 
-    let metaInfo = '';
-    if (c.fecha_inicio || c.vigencia) {
-      const dateStr = c.fecha_inicio ? formatDate(c.fecha_inicio) : '';
-      const vigStr = c.vigencia ? `(${c.vigencia})` : '';
-      metaInfo = `<span class="cli-date-info" title="Fecha de inicio y vigencia">📅 ${dateStr} ${vigStr}</span>`;
-    }
-
     tr.innerHTML = `
       <td>
         <div>
           <span class="cli-name">${esc(c.nombre)}</span>
-          ${c.notas_count > 0 ? `<span class="notes-pill"><span class="notes-icon">📝</span> NOTAS ${c.notas_count}</span>` : ''}
+          ${c.notes_count > 0 ? `<span class="notes-pill"><span class="notes-icon">📝</span> NOTAS ${c.notes_count}</span>` : ''}
         </div>
         <span class="cli-sector">${esc(c.sector || '')}</span>
         ${c.descripcion ? `<p class="cli-desc">${esc(c.descripcion)}</p>` : ''}
@@ -173,7 +166,6 @@ function renderTable() {
           <span class="pay-badge ${c.tipo_pago === 'A plazos' ? 'plazos' : 'unico'}" onclick="toggleTipoPago('${c.id}')" title="Haga click para cambiar el tipo de pago">
             ${esc(c.tipo_pago || 'Pago único')}
           </span>
-          ${metaInfo}
         </div>
         <div class="row-actions">
           <button class="ra-del" onclick="deleteCliente('${c.id}')" title="Eliminar cliente">✕ Eliminar</button>
@@ -233,10 +225,20 @@ function renderStageCell(cliente, stageKey) {
     }
   }
 
-  // Days
-  if (dias && dias > 0) {
+  // Days / Elapsed Time
+  let elapsedText = '';
+  if (dias !== null && dias !== undefined) {
+    elapsedText = `${dias}d`;
+  } else if (status !== 'empty') {
+    const baseDate = getBaseDate(cliente, stageKey);
+    const stageDate = cliente[`${stageKey}_date`] ? new Date(cliente[`${stageKey}_date`]) : null;
+    const endDate = (status === 'closed') ? (stageDate || new Date()) : new Date();
+    elapsedText = formatElapsedTime(baseDate, endDate);
+  }
+
+  if (elapsedText) {
     const capColor = getDiasCapColor(status);
-    captions += `<span class="cap ${capColor}">${dias}d</span>`;
+    captions += `<span class="cap ${capColor}">${elapsedText}</span>`;
   }
 
   return `
@@ -258,10 +260,20 @@ function renderE6Cell(cliente) {
   const subDesc = cliente.e6_sub_desc || '';
   const dias    = cliente.e6_dias;
 
+  let elapsedText = '';
+  if (dias !== null && dias !== undefined) {
+    elapsedText = `${dias}d`;
+  } else if (subType) {
+    const baseDate = getBaseDate(cliente, 'e6');
+    const stageDate = cliente.e6_date ? new Date(cliente.e6_date) : null;
+    const endDate = stageDate || new Date();
+    elapsedText = formatElapsedTime(baseDate, endDate);
+  }
+
   let captions = '';
-  if (dias && dias > 0) {
+  if (elapsedText) {
     const capColor = subType ? (subType === 'e6a' ? 'verde' : 'rojo') : 'muted';
-    captions = `<span class="cap ${capColor}">${dias}d</span>`;
+    captions = `<span class="cap ${capColor}">${elapsedText}</span>`;
   }
 
   if (!subType) {
@@ -630,8 +642,6 @@ async function handleSave() {
   const responsable = document.getElementById('f-responsable').value;
   const monto  = parseFloat(document.getElementById('f-monto').value) || 0;
   const tipo_pago = document.getElementById('f-tipo-pago').value || 'Pago único';
-  const fecha_inicio = document.getElementById('f-fecha-inicio').value || null;
-  const vigencia = document.getElementById('f-vigencia').value.trim() || null;
   const descripcion = document.getElementById('f-descripcion').value.trim() || null;
 
   // Validation
@@ -647,7 +657,7 @@ async function handleSave() {
   }
 
   const isE1Closed = monto > 0;
-  const baseStartDate = fecha_inicio ? new Date(fecha_inicio + 'T12:00:00').toISOString() : new Date().toISOString();
+  const baseStartDate = new Date().toISOString();
 
   const newCliente = {
     nombre,
@@ -655,8 +665,6 @@ async function handleSave() {
     responsable,
     notas_count: 0,
     tipo_pago,
-    fecha_inicio,
-    vigencia,
     descripcion,
     e1_status: isE1Closed ? 'closed' : 'empty',
     e1_monto: monto,
@@ -854,12 +862,6 @@ async function handleDocumentUpload(e) {
       }
     }
 
-    if (data.fecha_inicio) {
-      document.getElementById('f-fecha-inicio').value = data.fecha_inicio;
-    }
-    if (data.vigencia) {
-      document.getElementById('f-vigencia').value = data.vigencia;
-    }
     if (data.descripcion) {
       document.getElementById('f-descripcion').value = data.descripcion;
     }
@@ -877,6 +879,9 @@ async function handleDocumentUpload(e) {
       statusText.textContent = `Error: ${err.message}`;
     }
     toast(`Error al leer archivo: ${err.message}`, 'error');
+  } finally {
+    const docInput = document.getElementById('f-document');
+    if (docInput) docInput.value = '';
   }
 }
 
@@ -986,7 +991,7 @@ function getBaseDate(cliente, stageKey) {
   const stageOrder = ['e1', 'e2', 'e3', 'e4', 'nda_enviado', 'nda_firmado', 'cto_enviado', 'e6', 'cto_firmado', 'alta_portal'];
   const index = stageOrder.indexOf(stageKey);
   if (index <= 0) {
-    return cliente.fecha_inicio ? new Date(cliente.fecha_inicio + 'T12:00:00') : new Date(cliente.created_at || new Date());
+    return new Date(cliente.created_at || new Date());
   }
   for (let i = index - 1; i >= 0; i--) {
     const prevKey = stageOrder[i];
@@ -995,7 +1000,7 @@ function getBaseDate(cliente, stageKey) {
       return new Date(prevDate);
     }
   }
-  return cliente.fecha_inicio ? new Date(cliente.fecha_inicio + 'T12:00:00') : new Date(cliente.created_at || new Date());
+  return new Date(cliente.created_at || new Date());
 }
 
 function calculateDaysDifference(startDate, endDate) {
@@ -1007,4 +1012,24 @@ function calculateDaysDifference(startDate, endDate) {
   const diffTime = end.getTime() - start.getTime();
   const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
   return Math.max(0, diffDays);
+}
+
+function formatElapsedTime(startDateVal, endDateVal) {
+  if (!startDateVal || !endDateVal) return '';
+  const start = new Date(startDateVal);
+  const end = new Date(endDateVal);
+  const diffMs = end.getTime() - start.getTime();
+  if (diffMs < 0) return '0s';
+
+  const diffSec = Math.floor(diffMs / 1000);
+  if (diffSec < 60) return `${diffSec}s`;
+
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m`;
+
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h`;
+
+  const diffDays = Math.floor(diffHr / 24);
+  return `${diffDays}d`;
 }
