@@ -1,0 +1,3 @@
+// Supabase Configuration
+const SUPABASE_URL = 'https://zsistprfxptfsnypqpgx.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpzaXN0cHJmeHB0ZnNueXBxcGd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1MDE5NjYsImV4cCI6MjA5NjA3Nzk2Nn0.bCqscuyl7lAD365808oaqlOdUgRXmCCeDFwVcd9_gQw';

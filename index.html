@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cronograma Jurídico · Dashboard</title>
+  <meta name="description" content="Dashboard de seguimiento jurídico con cronograma de clientes y etapas del proceso legal.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;900&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <div class="container">
+
+    <!-- ——— TOPBAR ——— -->
+    <header class="topbar">
+      <div class="brand-block">
+        <div class="brand-mark">
+          <span class="wm-text">BW</span>
+        </div>
+        <div class="brand-divider"></div>
+        <div class="title-block">
+          <div class="doc-ref">PJ · Cronograma</div>
+          <h1>Pipeline Jurídico</h1>
+          <div class="meta" id="last-updated"></div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-add" id="btn-add-client" title="Agregar nuevo cliente">
+          <span>+</span> Nuevo Cliente
+        </button>
+      </div>
+    </header>
+
+    <!-- ——— TABLERO ——— -->
+    <div class="tablero-wrap">
+      <table class="tablero" id="tablero">
+        <thead>
+          <tr>
+            <th class="client-col">
+              <span class="col-step">Cliente</span>
+            </th>
+            <th class="resp-col">
+              <span class="col-step">Responsable</span>
+            </th>
+            <th class="stage">
+              <span class="col-step">E1</span>
+              <span class="col-sub">OC Presentada</span>
+              <span class="col-sub">✓ Monto</span>
+            </th>
+            <th class="stage">
+              <span class="col-step">E2</span>
+              <span class="col-sub">OC Aceptada</span>
+              <span class="col-sub">✓ Monto / Ajuste</span>
+            </th>
+            <th class="stage">
+              <span class="col-step">E3</span>
+              <span class="col-sub">Proc. Admin</span>
+            </th>
+            <th class="stage optional">
+              <span class="col-step">Alta en Portal</span>
+              <span class="col-sub">opcional</span>
+            </th>
+            <th class="stage">
+              <span class="col-step">E4</span>
+              <span class="col-sub">Docs Recibidos</span>
+            </th>
+            <th class="stage">
+              <span class="col-step">NDA</span>
+              <span class="col-sub">Enviado</span>
+            </th>
+            <th class="stage">
+              <span class="col-step">NDA</span>
+              <span class="col-sub">Firmado</span>
+            </th>
+            <th class="stage">
+              <span class="col-step">CTO.</span>
+              <span class="col-sub">Enviado</span>
+            </th>
+            <th class="stage sub-col">
+              <span class="col-step">E6a / E6b</span>
+              <span class="col-sub">Sub-Estado</span>
+            </th>
+            <th class="stage">
+              <span class="col-step">CTO.</span>
+              <span class="col-sub">Firmado</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody id="table-body">
+          <!-- Rows rendered by JS -->
+        </tbody>
+      </table>
+
+      <!-- Loading State -->
+      <div class="loading-overlay" id="loading">
+        <span class="loading-dot"></span> Cargando cronograma…
+      </div>
+
+      <!-- Empty State -->
+      <div class="empty-state" id="empty-state" style="display:none;">
+        <div class="empty-icon">📋</div>
+        <p>No hay clientes registrados. Agrega el primero con el botón de arriba.</p>
+      </div>
+    </div>
+
+    <!-- ——— MODAL: Nuevo / Editar Cliente ——— -->
+    <div class="modal" id="client-modal">
+      <div class="modal-card">
+        <div class="modal-head">
+          <div>
+            <h2 id="modal-title">Nuevo Cliente</h2>
+          </div>
+          <button class="modal-close" id="modal-close-btn">&times;</button>
+        </div>
+
+        <div class="modal-body">
+          <form id="client-form" autocomplete="off">
+            <div class="form-divider">Información del Cliente</div>
+            <div class="form-grid">
+              <label class="span-2">
+                <span class="req">Nombre del cliente</span>
+                <input type="text" id="f-nombre" required placeholder="Ej: GICSA, Total Play…">
+              </label>
+
+              <label>
+                <span>Sector</span>
+                <select id="f-sector">
+                  <option value="">— Seleccionar —</option>
+                  <option value="Energía">Energía</option>
+                  <option value="Telecomunicaciones">Telecomunicaciones</option>
+                  <option value="Media">Media</option>
+                  <option value="Consultoría">Consultoría</option>
+                  <option value="Industrial">Industrial</option>
+                  <option value="Proyectos Inmob.">Proyectos Inmob.</option>
+                  <option value="Tecnología">Tecnología</option>
+                  <option value="Otro">Otro</option>
+                </select>
+              </label>
+
+              <label>
+                <span class="req">Responsable</span>
+                <select id="f-responsable" required>
+                  <option value="">— Seleccionar —</option>
+                  <option value="MAJA">MAJA</option>
+                  <option value="CHUY">CHUY</option>
+                  <option value="ALONSO">ALONSO</option>
+                  <option value="JESÚS">JESÚS</option>
+                  <option value="CEO">CEO</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="form-divider">OC Inicial (Opcional)</div>
+            <div class="form-grid">
+              <label>
+                <span>Monto OC Presentada</span>
+                <input type="number" id="f-monto" placeholder="0" min="0" step="1000">
+              </label>
+              <label>
+                <span>&nbsp;</span>
+                <div style="font-family:var(--mono);font-size:10.5px;color:var(--char);padding:9px 0;letter-spacing:0.04em;">
+                  El monto se puede editar después directamente en la tabla.
+                </div>
+              </label>
+            </div>
+          </form>
+        </div>
+
+        <div class="modal-foot">
+          <button class="btn ghost" id="modal-cancel-btn">Cancelar</button>
+          <button class="btn solid" id="modal-save-btn">Guardar Cliente</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ——— STATUS PICKER (popup contextual) ——— -->
+    <div class="status-picker" id="status-picker"></div>
+
+    <!-- ——— TOAST CONTAINER ——— -->
+    <div class="toast-container" id="toast-container"></div>
+
+  </div>
+
+  <!-- Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+
+</body>
+</html>
