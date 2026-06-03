@@ -631,7 +631,11 @@ function populateResponsablesDropdown() {
   const $select = document.getElementById('f-responsable');
   if (!$select) return;
   
-  const dbResponsables = clientes.map(c => c.responsable).filter(r => r && r.trim() !== '');
+  const dbResponsables = clientes.map(c => c.responsable)
+    .filter(r => r && r.trim() !== '')
+    .filter(r => r !== r.toUpperCase()) // Quitar mayúsculas (MAJA, CHUY, ALONSO, etc.)
+    .filter(r => r.toLowerCase() !== 'brandon'); // Quitar Brandon
+    
   const allResponsables = [...new Set([...defaultResponsables, ...dbResponsables])];
   
   const currentValue = $select.value;
@@ -731,7 +735,8 @@ async function handleDocumentUpload(e) {
     
     if (data.responsable) {
       const respValue = data.responsable.trim();
-      if (respValue) {
+      const isInvalid = respValue === respValue.toUpperCase() || respValue.toLowerCase() === 'brandon';
+      if (respValue && !isInvalid) {
         if (!defaultResponsables.includes(respValue)) {
           defaultResponsables.push(respValue);
           populateResponsablesDropdown();
