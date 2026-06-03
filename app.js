@@ -737,16 +737,34 @@ async function handleDocumentUpload(e) {
       const respValue = data.responsable.trim();
       const isInvalid = respValue === respValue.toUpperCase() || respValue.toLowerCase() === 'brandon';
       if (respValue && !isInvalid) {
-        if (!defaultResponsables.includes(respValue)) {
-          defaultResponsables.push(respValue);
-          populateResponsablesDropdown();
+        // Buscar coincidencia insensible a mayúsculas
+        const matchedResp = defaultResponsables.find(r => r.toLowerCase() === respValue.toLowerCase());
+        if (matchedResp) {
+          document.getElementById('f-responsable').value = matchedResp;
+        } else {
+          // Capitalizar la primera letra del nombre nuevo para que se vea limpio
+          const formattedName = respValue.charAt(0).toUpperCase() + respValue.slice(1).toLowerCase();
+          if (!defaultResponsables.includes(formattedName)) {
+            defaultResponsables.push(formattedName);
+            populateResponsablesDropdown();
+          }
+          document.getElementById('f-responsable').value = formattedName;
         }
-        document.getElementById('f-responsable').value = respValue;
       }
     }
     
-    if (data.monto) document.getElementById('f-monto').value = data.monto;
-    if (data.tipo_pago) document.getElementById('f-tipo-pago').value = data.tipo_pago;
+    if (data.monto !== undefined && data.monto !== null) {
+      document.getElementById('f-monto').value = data.monto;
+    }
+    
+    if (data.tipo_pago) {
+      const payVal = data.tipo_pago.trim().toLowerCase();
+      if (payVal.includes('plazo') || payVal.includes('mensual') || payVal.includes('recurrente') || payVal.includes('hitos')) {
+        document.getElementById('f-tipo-pago').value = 'A plazos';
+      } else {
+        document.getElementById('f-tipo-pago').value = 'Pago único';
+      }
+    }
 
     if (statusText) {
       statusText.className = 'doc-status success';
