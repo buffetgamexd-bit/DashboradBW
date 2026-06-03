@@ -452,12 +452,37 @@ function closePicker() {
 async function setStatus(clienteId, field, value) {
   closePicker();
 
-  // Optimistic update
+  const stageKey = field.replace('_status', '');
+  const dateField = `${stageKey}_date`;
+  const diasField = `${stageKey}_dias`;
+  
   const cliente = clientes.find(c => c.id === clienteId);
-  if (cliente) cliente[field] = value;
+  if (!cliente) return;
+  
+  const nowStr = new Date().toISOString();
+  let dateValue = null;
+  let diasValue = null;
+  
+  if (value !== 'empty') {
+    dateValue = nowStr;
+    const baseDate = getBaseDate(cliente, stageKey);
+    diasValue = calculateDaysDifference(baseDate, dateValue);
+  }
+  
+  // Optimistic update
+  cliente[field] = value;
+  cliente[dateField] = dateValue;
+  cliente[diasField] = diasValue;
   renderTable();
 
-  const { error } = await db.from('clientes').update({ [field]: value, updated_at: new Date().toISOString() }).eq('id', clienteId);
+  const updates = {
+    [field]: value,
+    [dateField]: dateValue,
+    [diasField]: diasValue,
+    updated_at: nowStr
+  };
+
+  const { error } = await db.from('clientes').update(updates).eq('id', clienteId);
 
   if (error) {
     toast('Error al actualizar: ' + error.message, 'error');
@@ -515,23 +540,42 @@ async function setE6(clienteId, value) {
   closePicker();
 
   const descMap = { e6a: 'sin comentarios', e6b: 'con comentarios' };
+  const nowStr = new Date().toISOString();
+  
+  const cliente = clientes.find(c => c.id === clienteId);
+  if (!cliente) return;
+  
+  let dateValue = null;
+  let diasValue = null;
+  
+  if (value) {
+    dateValue = nowStr;
+    const baseDate = getBaseDate(cliente, 'e6');
+    diasValue = calculateDaysDifference(baseDate, dateValue);
+  }
+  
   const updates = {
     e6_sub_type: value,
     e6_sub_desc: value ? descMap[value] : null,
-    updated_at: new Date().toISOString()
+    e6_date: dateValue,
+    e6_dias: diasValue,
+    updated_at: nowStr
   };
 
-  const cliente = clientes.find(c => c.id === clienteId);
-  if (cliente) {
-    cliente.e6_sub_type = updates.e6_sub_type;
-    cliente.e6_sub_desc = updates.e6_sub_desc;
-  }
+  // Optimistic update
+  cliente.e6_sub_type = updates.e6_sub_type;
+  cliente.e6_sub_desc = updates.e6_sub_desc;
+  cliente.e6_date = updates.e6_date;
+  cliente.e6_dias = updates.e6_dias;
+  
   renderTable();
 
   const { error } = await db.from('clientes').update(updates).eq('id', clienteId);
   if (error) {
     toast('Error al actualizar E6: ' + error.message, 'error');
     await fetchClientes();
+  } else {
+    updateTimestamp();
   }
 }
 
@@ -602,6 +646,9 @@ async function handleSave() {
     return;
   }
 
+  const isE1Closed = monto > 0;
+  const baseStartDate = fecha_inicio ? new Date(fecha_inicio + 'T12:00:00').toISOString() : new Date().toISOString();
+
   const newCliente = {
     nombre,
     sector,
@@ -611,17 +658,37 @@ async function handleSave() {
     fecha_inicio,
     vigencia,
     descripcion,
-    e1_status: monto > 0 ? 'closed' : 'empty',
+    e1_status: isE1Closed ? 'closed' : 'empty',
     e1_monto: monto,
+    e1_date: isE1Closed ? baseStartDate : null,
+    e1_dias: isE1Closed ? 0 : null,
     e2_status: 'empty',
     e2_monto: 0,
+    e2_dias: null,
+    e2_date: null,
     e3_status: 'empty',
+    e3_dias: null,
+    e3_date: null,
     e4_status: 'empty',
+    e4_dias: null,
+    e4_date: null,
     nda_enviado_status: 'empty',
+    nda_enviado_dias: null,
+    nda_enviado_date: null,
     nda_firmado_status: 'empty',
+    nda_firmado_dias: null,
+    nda_firmado_date: null,
     cto_enviado_status: 'empty',
+    cto_enviado_dias: null,
+    cto_enviado_date: null,
+    e6_dias: null,
+    e6_date: null,
     cto_firmado_status: 'empty',
+    cto_firmado_dias: null,
+    cto_firmado_date: null,
     alta_portal_status: 'empty',
+    alta_portal_dias: null,
+    alta_portal_date: null,
   };
 
   closeModal();
@@ -913,4 +980,31 @@ function formatDate(dateStr) {
   } catch (e) {
     return dateStr;
   }
+}
+
+function getBaseDate(cliente, stageKey) {
+  const stageOrder = ['e1', 'e2', 'e3', 'e4', 'nda_enviado', 'nda_firmado', 'cto_enviado', 'e6', 'cto_firmado', 'alta_portal'];
+  const index = stageOrder.indexOf(stageKey);
+  if (index <= 0) {
+    return cliente.fecha_inicio ? new Date(cliente.fecha_inicio + 'T12:00:00') : new Date(cliente.created_at || new Date());
+  }
+  for (let i = index - 1; i >= 0; i--) {
+    const prevKey = stageOrder[i];
+    const prevDate = cliente[`${prevKey}_date`] || (prevKey === 'e6' ? cliente.e6_date : null);
+    if (prevDate) {
+      return new Date(prevDate);
+    }
+  }
+  return cliente.fecha_inicio ? new Date(cliente.fecha_inicio + 'T12:00:00') : new Date(cliente.created_at || new Date());
+}
+
+function calculateDaysDifference(startDate, endDate) {
+  if (!startDate || !endDate) return null;
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  start.setHours(0, 0, 0, 0);
+  end.setHours(0, 0, 0, 0);
+  const diffTime = end.getTime() - start.getTime();
+  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+  return Math.max(0, diffDays);
 }

@@ -66,6 +66,18 @@ CREATE TABLE clientes (
   cto_firmado_status TEXT DEFAULT 'empty',
   cto_firmado_dias INTEGER DEFAULT NULL,
 
+  -- Fechas de etapas para cálculo automático de días
+  e1_date TIMESTAMPTZ DEFAULT NULL,
+  e2_date TIMESTAMPTZ DEFAULT NULL,
+  e3_date TIMESTAMPTZ DEFAULT NULL,
+  e4_date TIMESTAMPTZ DEFAULT NULL,
+  nda_enviado_date TIMESTAMPTZ DEFAULT NULL,
+  nda_firmado_date TIMESTAMPTZ DEFAULT NULL,
+  cto_enviado_date TIMESTAMPTZ DEFAULT NULL,
+  e6_date TIMESTAMPTZ DEFAULT NULL,
+  cto_firmado_date TIMESTAMPTZ DEFAULT NULL,
+  alta_portal_date TIMESTAMPTZ DEFAULT NULL,
+
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
