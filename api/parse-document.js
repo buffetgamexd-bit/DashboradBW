@@ -18,11 +18,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { text } = req.body;
-
-    if (!text || text.trim() === '') {
-      return res.status(400).json({ error: 'No se recibió texto del documento.' });
-    }
+    const { text, images } = req.body;
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
@@ -30,19 +26,14 @@ export default async function handler(req, res) {
     }
 
     const systemPrompt = `Eres un asistente experto en analizar documentos corporativos, contratos y propuestas comerciales. 
-Tu tarea es extraer información clave del texto y formatearla estrictamente en formato JSON sin explicaciones adicionales.`;
+Tu tarea es extraer información clave del texto o de las imágenes provistas y formatearla estrictamente en formato JSON sin explicaciones adicionales.`;
 
-    const userPrompt = `Analiza el siguiente documento (contrato, propuesta u orden de compra) y extrae la información del cliente.
+    const userPrompt = `Analiza el documento provisto (contrato, propuesta u orden de compra) y extrae la información del cliente.
     
-Documento:
-"""
-${text}
-"""
-
 Responde ÚNICAMENTE con un objeto JSON válido con la siguiente estructura (no agregues formato markdown, no uses \`\`\`json ni agregues comentarios o texto extra):
 {
   "nombre": "Nombre del cliente o empresa",
-  "sector": "Energía" o "Telecomunicaciones" o "Media" o "Consultoría" o "Industrial" o "Proyectos Inmob." o "Tecnología" o "Otro",
+  "sector": "Ej: Energía, Telecomunicaciones, Consultoría, Media, Proyectos Inmob., etc. (extrae el sector o industria del cliente, si no está claro pon 'Otro')",
   "responsable": "Jesus" o "Alonso" o "Johana" o "Marisol" o "" (deja vacío si no se menciona a ninguno de ellos),
   "monto": 120000,
   "tipo_pago": "Pago único" o "A plazos"
@@ -50,10 +41,43 @@ Responde ÚNICAMENTE con un objeto JSON válido con la siguiente estructura (no 
 
 Reglas para la extracción:
 1. "nombre": Extrae el nombre oficial del cliente.
-2. "sector": Clasifícalo según las opciones indicadas. Si no queda claro, usa "Otro".
-3. "responsable": Si se menciona a 'Jesus', 'Alonso', 'Johana' o 'Marisol' (por ejemplo en firmas, testigos o cuentas de correo), selecciónalo. Si no se menciona o no está claro, pon "".
-4. "monto": Extrae el valor total del contrato o de la inversión inicial. Si es a plazos o pago mensual, pon el monto mensual inicial. Debe ser un número puro sin comas ni símbolos (ej: 60000).
+2. "sector": Extrae la industria o sector a la que pertenece el cliente.
+3. "responsable": Si se menciona a 'Jesus', 'Alonso', 'Johana' o 'Marisol' (por ejemplo en firmas, testigos, representantes o cuentas de correo), selecciónalo. Si no se menciona o no está claro, pon "".
+4. "monto": Extrae el valor total del contrato o de la inversión inicial. Si es a plazos o pago mensual, pon el monto mensual inicial. Debe ser un número puro sin comas ni símbolos (ej: 60000). Si no encuentras ningún monto, pon 0.
 5. "tipo_pago": Si el documento indica pago mensual, recurrente, a mensualidades, cuotas, fee mensual o vigencia de varios meses con pagos periódicos, pon "A plazos". Si es un pago en una sola exhibición, único o de contado, pon "Pago único".`;
+
+    // Armar el contenido del mensaje según si recibimos texto o imágenes
+    let messageContent = [];
+
+    if (images && Array.isArray(images) && images.length > 0) {
+      // Caso Multimodal: Procesar páginas renderizadas como imágenes
+      images.forEach((imgBase64, idx) => {
+        messageContent.push({
+          type: 'text',
+          text: `[Página ${idx + 1}]`
+        });
+        messageContent.push({
+          type: 'image',
+          source: {
+            type: 'base64',
+            media_type: 'image/jpeg',
+            data: imgBase64
+          }
+        });
+      });
+      messageContent.push({
+        type: 'text',
+        text: userPrompt
+      });
+    } else if (text && text.trim() !== '') {
+      // Caso de texto normal (DOCX / TXT)
+      messageContent.push({
+        type: 'text',
+        text: `Documento a analizar:\n"""\n${text}\n"""\n\n${userPrompt}`
+      });
+    } else {
+      return res.status(400).json({ error: 'No se recibió texto ni imágenes del documento.' });
+    }
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -70,7 +94,7 @@ Reglas para la extracción:
         messages: [
           {
             role: 'user',
-            content: userPrompt
+            content: messageContent
           }
         ]
       })

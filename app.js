@@ -694,25 +694,29 @@ async function handleDocumentUpload(e) {
   const statusText = document.getElementById('doc-status-text');
   if (statusText) {
     statusText.className = 'doc-status loading';
-    statusText.textContent = `Leyendo archivo: ${file.name}...`;
+    statusText.textContent = `Procesando archivo: ${file.name}...`;
   }
 
   try {
-    let text = '';
+    let payload = {};
     const extension = file.name.split('.').pop().toLowerCase();
 
     if (extension === 'txt') {
-      text = await readTextFile(file);
+      const text = await readTextFile(file);
+      payload = { text };
     } else if (extension === 'pdf') {
-      text = await readPdfFile(file);
+      if (statusText) statusText.textContent = 'Renderizando páginas del PDF como imágenes...';
+      const images = await renderPdfToImages(file);
+      payload = { images };
     } else if (extension === 'docx') {
-      text = await readDocxFile(file);
+      const text = await readDocxFile(file);
+      payload = { text };
     } else {
       throw new Error('Formato de archivo no soportado. Sube un PDF, DOCX o TXT.');
     }
 
     if (statusText) {
-      statusText.textContent = 'Enviando a Claude para análisis...';
+      statusText.textContent = 'Enviando imágenes/texto a Claude 4.6 para análisis...';
     }
 
     const response = await fetch('/api/parse-document', {
@@ -720,7 +724,7 @@ async function handleDocumentUpload(e) {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ text })
+      body: JSON.stringify(payload)
     });
 
     if (!response.ok) {
@@ -791,21 +795,35 @@ function readTextFile(file) {
   });
 }
 
-async function readPdfFile(file) {
+async function renderPdfToImages(file) {
   const arrayBuffer = await file.arrayBuffer();
   window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
   
   const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  let fullText = '';
+  const images = [];
   
-  for (let i = 1; i <= pdf.numPages; i++) {
+  // Renderizar máximo las primeras 3 páginas para evitar sobrecargar la petición
+  const pagesToRender = Math.min(pdf.numPages, 3);
+  
+  for (let i = 1; i <= pagesToRender; i++) {
     const page = await pdf.getPage(i);
-    const textContent = await page.getTextContent();
-    const pageText = textContent.items.map(item => item.str).join(' ');
-    fullText += `\n--- Página ${i} ---\n` + pageText;
+    const viewport = page.getViewport({ scale: 1.5 }); // Escala ideal para legibilidad de texto
+    
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    canvas.height = viewport.height;
+    canvas.width = viewport.width;
+    
+    // Renderizar la página en el canvas
+    await page.render({ canvasContext: context, viewport: viewport }).promise;
+    
+    // Obtener la imagen base64 como JPEG (comprimido al 85% para mantener un tamaño ligero)
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    const base64Data = dataUrl.split(',')[1];
+    images.push(base64Data);
   }
   
-  return fullText;
+  return images;
 }
 
 async function readDocxFile(file) {
