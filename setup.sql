@@ -188,3 +188,22 @@ VALUES ('P.P.A', 'Industrial', 'JESÚS', 0,
   'current_rojo_cli', 4,
   'empty', 'empty',
   'empty', 'empty');
+
+-- ============================================
+-- Tabla de Comentarios
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS comentarios (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  cliente_id UUID REFERENCES clientes(id) ON DELETE CASCADE,
+  autor TEXT NOT NULL,
+  texto TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Habilitar RLS en comentarios
+ALTER TABLE comentarios ENABLE ROW LEVEL SECURITY;
+
+-- Política de acceso para comentarios
+CREATE POLICY "Allow all operations on comments" ON comentarios
+  FOR ALL USING (true) WITH CHECK (true);

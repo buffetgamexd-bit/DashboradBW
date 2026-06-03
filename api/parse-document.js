@@ -36,7 +36,7 @@ Responde ÚNICAMENTE con un objeto JSON válido con la siguiente estructura (no 
   "sector": "Ej: Energía, Telecomunicaciones, Consultoría, Media, Proyectos Inmob., etc. (extrae el sector o industria del cliente, si no está claro pon 'Otro')",
   "responsable": "Jesus" o "Alonso" o "Johana" o "Marisol" o "" (deja vacío si no se menciona a ninguno de ellos),
   "monto": 120000,
-  "tipo_pago": "Pago único" o "A plazos",
+  "tipo_pago": "Pago único" o "A plazos (X mensualidades)" o "A plazos (X pagos)",
   "descripcion": "Resumen de max 12 palabras del servicio o alcance" o null
 }
 
@@ -45,7 +45,7 @@ Reglas para la extracción:
 2. "sector": Extrae la industria o sector a la que pertenece el cliente.
 3. "responsable": Si se menciona a 'Jesus', 'Alonso', 'Johana' o 'Marisol' (por ejemplo en firmas, testigos, representantes o cuentas de correo), selecciónalo. Si no se menciona o no está claro, pon "".
 4. "monto": Extrae el valor total del contrato o de la inversión inicial. Si es a plazos o pago mensual, pon el monto mensual inicial. Debe ser un número puro sin comas ni símbolos (ej: 60000). Si no encuentras ningún monto, pon 0.
-5. "tipo_pago": Si el documento indica pago mensual, recurrente, a mensualidades, cuotas, fee mensual o vigencia de varios meses con pagos periódicos, pon "A plazos". Si es un pago en una sola exhibición, único o de contado, pon "Pago único".
+5. "tipo_pago": Si el documento indica pago mensual, recurrente, a mensualidades, cuotas, fee mensual o vigencia de varios meses con pagos periódicos, extrae e indica el detalle de plazos o mensualidades si se menciona, ej: "A plazos (12 mensualidades)", "A plazos (6 mensualidades)", "A plazos (3 pagos)". Si es a plazos pero no se especifica cuántos, pon simplemente "A plazos". Si es un pago en una sola exhibición, único o de contado, pon "Pago único".
 6. "descripcion": Resume brevemente para qué es el servicio (ej: "Consultoría reputacional", "Manejo de menciones en medios", "Servicios de comunicación"). Máximo 12 palabras.`;
 
     // Armar el contenido del mensaje según si recibimos texto o imágenes

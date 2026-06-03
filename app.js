@@ -9,7 +9,9 @@ const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // ——— STATE ———
 let clientes = [];
 let activePicker = null; // { clienteId, field, element }
-let defaultResponsables = ['Jesus', 'Alonso', 'Johana', 'Marisol'];
+let defaultResponsables = ['Jesus', 'Alonso', 'Fabiola'];
+let currentUser = null;
+let currentOpenClienteId = null;
 
 // ——— STAGE DEFINITIONS ———
 const STAGES = [
@@ -56,11 +58,58 @@ document.addEventListener('DOMContentLoaded', init);
 
 async function init() {
   bindEvents();
-  await fetchClientes();
+  checkAuth();
   updateTimestamp();
 }
 
+function checkAuth() {
+  currentUser = localStorage.getItem('currentUser');
+  const overlay = document.getElementById('login-overlay');
+  const profile = document.getElementById('user-profile');
+  
+  if (!currentUser) {
+    overlay.style.display = 'flex';
+    profile.style.display = 'none';
+  } else {
+    overlay.style.display = 'none';
+    profile.style.display = 'flex';
+    
+    document.getElementById('user-display-name').textContent = currentUser;
+    document.getElementById('user-avatar').textContent = currentUser.charAt(0).toUpperCase();
+    
+    fetchClientes();
+  }
+}
+
 function bindEvents() {
+  // Login Form Submission
+  const loginForm = document.getElementById('login-form');
+  if (loginForm) {
+    loginForm.addEventListener('submit', handleLogin);
+  }
+
+  // Logout Button
+  const logoutBtn = document.getElementById('btn-logout');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', handleLogout);
+  }
+
+  // Comments Drawer Close Buttons
+  const drawerCloseBtn = document.getElementById('drawer-close-btn');
+  if (drawerCloseBtn) {
+    drawerCloseBtn.addEventListener('click', closeCommentsDrawer);
+  }
+  const drawerOverlay = document.getElementById('comments-drawer-overlay');
+  if (drawerOverlay) {
+    drawerOverlay.addEventListener('click', closeCommentsDrawer);
+  }
+
+  // Save comment button
+  const saveCommentBtn = document.getElementById('btn-save-comment');
+  if (saveCommentBtn) {
+    saveCommentBtn.addEventListener('click', handleSaveComment);
+  }
+
   // Add client button
   document.getElementById('btn-add-client').addEventListener('click', openAddModal);
 
@@ -88,6 +137,7 @@ function bindEvents() {
     if (e.key === 'Escape') {
       closeModal();
       closePicker();
+      closeCommentsDrawer();
     }
   });
 
@@ -154,16 +204,21 @@ function renderTable() {
     const tr = document.createElement('tr');
     tr.dataset.id = c.id;
 
+    const notesCount = c.notas_count || 0;
+    const notesText = notesCount > 0 ? `NOTAS ${notesCount}` : 'Añadir Nota';
+    const notesClass = notesCount > 0 ? 'notes-pill' : 'notes-pill empty';
+    const isPlazos = c.tipo_pago && c.tipo_pago.includes('A plazos');
+
     tr.innerHTML = `
       <td>
         <div>
           <span class="cli-name">${esc(c.nombre)}</span>
-          ${c.notes_count > 0 ? `<span class="notes-pill"><span class="notes-icon">📝</span> NOTAS ${c.notes_count}</span>` : ''}
+          <span class="${notesClass}" onclick="openCommentsDrawer('${c.id}')"><span class="notes-icon">📝</span> ${notesText}</span>
         </div>
         <span class="cli-sector">${esc(c.sector || '')}</span>
         ${c.descripcion ? `<p class="cli-desc">${esc(c.descripcion)}</p>` : ''}
         <div class="cli-meta-row">
-          <span class="pay-badge ${c.tipo_pago === 'A plazos' ? 'plazos' : 'unico'}" onclick="toggleTipoPago('${c.id}')" title="Haga click para cambiar el tipo de pago">
+          <span class="pay-badge ${isPlazos ? 'plazos' : 'unico'}" onclick="toggleTipoPago('${c.id}')" title="Haga click para cambiar el tipo de pago">
             ${esc(c.tipo_pago || 'Pago único')}
           </span>
         </div>
@@ -765,7 +820,7 @@ async function toggleTipoPago(clienteId) {
   const cliente = clientes.find(c => c.id === clienteId);
   if (!cliente) return;
   
-  const nextValue = (cliente.tipo_pago === 'A plazos') ? 'Pago único' : 'A plazos';
+  const nextValue = (cliente.tipo_pago && cliente.tipo_pago.includes('A plazos')) ? 'Pago único' : 'A plazos';
   cliente.tipo_pago = nextValue;
   renderTable();
   
@@ -1032,4 +1087,143 @@ function formatElapsedTime(startDateVal, endDateVal) {
 
   const diffDays = Math.floor(diffHr / 24);
   return `${diffDays}d`;
+}
+
+// ——— LOGIN FUNCTIONS ———
+function handleLogin(e) {
+  e.preventDefault();
+  const user = document.getElementById('login-user').value;
+  const pass = document.getElementById('login-pass').value;
+  const errorMsg = document.getElementById('login-error-msg');
+
+  if (!user) return;
+
+  if (pass === 'legal123') {
+    localStorage.setItem('currentUser', user);
+    errorMsg.style.display = 'none';
+    document.getElementById('login-pass').value = '';
+    checkAuth();
+  } else {
+    errorMsg.style.display = 'block';
+  }
+}
+
+function handleLogout() {
+  localStorage.removeItem('currentUser');
+  currentUser = null;
+  checkAuth();
+}
+
+// ——— COMMENTS (DRAWER) ———
+async function openCommentsDrawer(clienteId) {
+  currentOpenClienteId = clienteId;
+  const cliente = clientes.find(c => c.id === clienteId);
+  if (!cliente) return;
+
+  document.getElementById('drawer-client-name').textContent = cliente.nombre;
+  document.getElementById('f-comment-text').value = '';
+  
+  document.getElementById('comments-drawer').classList.add('is-open');
+  document.getElementById('comments-drawer-overlay').classList.add('is-open');
+
+  await fetchAndRenderComments(clienteId);
+}
+
+function closeCommentsDrawer() {
+  document.getElementById('comments-drawer').classList.remove('is-open');
+  document.getElementById('comments-drawer-overlay').classList.remove('is-open');
+  currentOpenClienteId = null;
+}
+
+async function fetchAndRenderComments(clienteId) {
+  const listEl = document.getElementById('comments-list');
+  listEl.innerHTML = '<div class="loading-overlay" style="padding:20px 0;"><span class="loading-dot"></span> Cargando notas…</div>';
+
+  const { data, error } = await db
+    .from('comentarios')
+    .select('*')
+    .eq('cliente_id', clienteId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching comments:', error);
+    listEl.innerHTML = '<div style="color:var(--crimson);font-size:12px;font-family:var(--mono);">Error al cargar comentarios.</div>';
+    return;
+  }
+
+  if (!data || data.length === 0) {
+    listEl.innerHTML = '<div style="color:var(--char);font-size:12px;font-family:var(--mono);text-align:center;padding:20px 0;">No hay notas registradas para este cliente.</div>';
+    return;
+  }
+
+  listEl.innerHTML = '';
+  data.forEach(comment => {
+    const item = document.createElement('div');
+    item.className = 'comment-item';
+
+    const authorName = comment.autor || 'Otro';
+    const initial = authorName.charAt(0).toUpperCase();
+    
+    let userClass = 'user-other';
+    if (authorName === 'Jesus') userClass = 'user-J';
+    else if (authorName === 'Alonso') userClass = 'user-A';
+    else if (authorName === 'Fabiola') userClass = 'user-F';
+
+    const commentDate = new Date(comment.created_at);
+    const dateStr = commentDate.toLocaleString('es-MX', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+
+    item.innerHTML = `
+      <div class="comment-avatar ${userClass}">${initial}</div>
+      <div class="comment-content">
+        <div class="comment-meta">
+          <span class="comment-author">${esc(authorName)}</span>
+          <span class="comment-date">${dateStr}</span>
+        </div>
+        <div class="comment-text">${esc(comment.texto)}</div>
+      </div>
+    `;
+    listEl.appendChild(item);
+  });
+}
+
+async function handleSaveComment() {
+  if (!currentOpenClienteId) return;
+
+  const textEl = document.getElementById('f-comment-text');
+  const text = textEl.value.trim();
+  if (!text) return;
+
+  const user = currentUser || 'Otro';
+
+  const btn = document.getElementById('btn-save-comment');
+  btn.disabled = true;
+
+  const { data, error } = await db.from('comentarios').insert([
+    {
+      cliente_id: currentOpenClienteId,
+      autor: user,
+      texto: text
+    }
+  ]).select();
+
+  if (error) {
+    toast('Error al guardar comentario: ' + error.message, 'error');
+    btn.disabled = false;
+    return;
+  }
+
+  textEl.value = '';
+  btn.disabled = false;
+
+  const cliente = clientes.find(c => c.id === currentOpenClienteId);
+  if (cliente) {
+    cliente.notas_count = (cliente.notas_count || 0) + 1;
+    await db.from('clientes').update({ notas_count: cliente.notas_count }).eq('id', currentOpenClienteId);
+  }
+
+  await fetchAndRenderComments(currentOpenClienteId);
+  renderTable();
 }
