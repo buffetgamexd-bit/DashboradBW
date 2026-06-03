@@ -948,3 +948,142 @@ table.tablero tr:hover .row-actions {
     grid-column: span 1;
   }
 }
+
+/* ——— NEW STYLES: CLAUDE DOC PARSER & TIPO PAGO ——— */
+.doc-upload-box {
+  background: rgba(20, 36, 92, 0.03);
+  border: 1.5px dashed var(--rule);
+  border-radius: 4px;
+  padding: 16px;
+  text-align: center;
+  margin-bottom: 20px;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.doc-upload-box:hover, .doc-upload-box.dragover {
+  border-color: var(--teal);
+  background: rgba(31, 143, 124, 0.03);
+}
+
+.doc-upload-box .dub-title {
+  display: block;
+  font-weight: 600;
+  font-size: 12.5px;
+  color: var(--ink-900);
+  margin-bottom: 4px;
+}
+
+.doc-upload-box p {
+  font-size: 11.5px;
+  color: var(--char);
+  margin-bottom: 12px;
+}
+
+.btn-upload {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--ink-800);
+  color: var(--paper-bright);
+  font-size: 11.5px;
+  font-family: var(--sans);
+  font-weight: 500;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.btn-upload:hover {
+  background: var(--ink-900);
+}
+
+.doc-status {
+  display: block;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  margin-top: 8px;
+  color: var(--char);
+}
+
+.doc-status.loading {
+  color: var(--amber);
+  font-weight: 600;
+}
+
+.doc-status.success {
+  color: var(--teal);
+  font-weight: 600;
+}
+
+.doc-status.error {
+  color: var(--crimson);
+  font-weight: 600;
+}
+
+/* Payment type badges */
+.pay-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  font-family: var(--mono);
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: 3px;
+  margin-top: 5px;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.1s, box-shadow 0.12s;
+}
+
+.pay-badge:hover {
+  transform: translateY(-1px);
+}
+
+.pay-badge.plazos {
+  background: rgba(31, 143, 124, 0.08);
+  color: var(--teal);
+  border: 1px solid rgba(31, 143, 124, 0.3);
+  box-shadow: 0 1px 3px rgba(31, 143, 124, 0.05);
+}
+
+.pay-badge.unico {
+  background: rgba(20, 36, 92, 0.05);
+  color: var(--ink-700);
+  border: 1px solid rgba(20, 36, 92, 0.15);
+}
+
+/* Responsible Selector Wrap */
+.resp-select-wrap {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.resp-select-wrap select {
+  flex: 1;
+}
+
+.btn-add-resp {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--paper-soft);
+  color: var(--ink-800);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  font-size: 18px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.btn-add-resp:hover {
+  background: var(--ink-800);
+  color: var(--paper-bright);
+  border-color: var(--ink-800);
+}

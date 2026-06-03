@@ -9,19 +9,20 @@ const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // ——— STATE ———
 let clientes = [];
 let activePicker = null; // { clienteId, field, element }
+let defaultResponsables = ['Jesus', 'Alonso', 'Johana', 'Marisol'];
 
 // ——— STAGE DEFINITIONS ———
 const STAGES = [
   { key: 'e1', label: 'E1', hasMonto: true },
   { key: 'e2', label: 'E2', hasMonto: true, hasDiff: true },
   { key: 'e3', label: 'E3' },
-  { key: 'alta_portal', label: 'Alta' },
   { key: 'e4', label: 'E4' },
   { key: 'nda_enviado', label: 'NDA Env.' },
   { key: 'nda_firmado', label: 'NDA Firm.' },
   { key: 'cto_enviado', label: 'CTO Env.' },
   { key: 'e6', label: 'E6', isSubState: true },
   { key: 'cto_firmado', label: 'CTO Firm.' },
+  { key: 'alta_portal', label: 'Alta' },
 ];
 
 const STATUS_OPTIONS = [
@@ -77,7 +78,7 @@ function bindEvents() {
 
   // Close picker on outside click
   document.addEventListener('click', (e) => {
-    if (activePicker && !$picker.contains(e.target) && !e.target.closest('.badge')) {
+    if (activePicker && !$picker.contains(e.target) && !e.target.closest('.badge') && !e.target.closest('.sub-tag') && !e.target.closest('.sub-empty')) {
       closePicker();
     }
   });
@@ -89,6 +90,35 @@ function bindEvents() {
       closePicker();
     }
   });
+
+  // Add new responsible button
+  document.getElementById('btn-add-resp').addEventListener('click', handleAddNewResponsable);
+
+  // Document upload events
+  const docInput = document.getElementById('f-document');
+  if (docInput) {
+    docInput.addEventListener('change', handleDocumentUpload);
+  }
+
+  const $uploadBox = document.getElementById('doc-upload-box');
+  if ($uploadBox) {
+    $uploadBox.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      $uploadBox.classList.add('dragover');
+    });
+    $uploadBox.addEventListener('dragleave', () => {
+      $uploadBox.classList.remove('dragover');
+    });
+    $uploadBox.addEventListener('drop', (e) => {
+      e.preventDefault();
+      $uploadBox.classList.remove('dragover');
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        docInput.files = files;
+        handleDocumentUpload({ target: { files } });
+      }
+    });
+  }
 }
 
 // ——— FETCH DATA ———
@@ -104,6 +134,7 @@ async function fetchClientes() {
   }
 
   clientes = data || [];
+  populateResponsablesDropdown();
   renderTable();
   showLoading(false);
 }
@@ -130,6 +161,9 @@ function renderTable() {
           ${c.notas_count > 0 ? `<span class="notes-pill"><span class="notes-icon">📝</span> NOTAS ${c.notas_count}</span>` : ''}
         </div>
         <span class="cli-sector">${esc(c.sector || '')}</span>
+        <span class="pay-badge ${c.tipo_pago === 'A plazos' ? 'plazos' : 'unico'}" onclick="toggleTipoPago('${c.id}')" title="Haga click para cambiar el tipo de pago">
+          ${esc(c.tipo_pago || 'Pago único')}
+        </span>
         <div class="row-actions">
           <button class="ra-del" onclick="deleteCliente('${c.id}')" title="Eliminar cliente">✕ Eliminar</button>
         </div>
@@ -140,13 +174,13 @@ function renderTable() {
       ${renderStageCell(c, 'e1')}
       ${renderStageCell(c, 'e2')}
       ${renderStageCell(c, 'e3')}
-      ${renderStageCell(c, 'alta_portal')}
       ${renderStageCell(c, 'e4')}
       ${renderStageCell(c, 'nda_enviado')}
       ${renderStageCell(c, 'nda_firmado')}
       ${renderStageCell(c, 'cto_enviado')}
       ${renderE6Cell(c)}
       ${renderStageCell(c, 'cto_firmado')}
+      ${renderStageCell(c, 'alta_portal')}
     `;
 
     $body.appendChild(tr);
@@ -177,7 +211,11 @@ function renderStageCell(cliente, stageKey) {
       captions += `<span class="cap">${formatMoney(cliente.e2_monto)}</span>`;
     }
     if (cliente.e2_diff && cliente.e2_diff !== 0) {
-      captions += `<span class="cap diff">${formatMoney(cliente.e2_diff)}</span>`;
+      const isNeg = cliente.e2_diff < 0;
+      const diffColor = isNeg ? 'var(--crimson)' : 'var(--teal)';
+      const diffSymbol = isNeg ? '▼' : '▲';
+      const diffSign = isNeg ? '' : '+';
+      captions += `<span class="cap" style="color:${diffColor};font-weight:700;font-size:9.5px;margin-top:2px;">${diffSymbol} ${diffSign}${formatMoney(cliente.e2_diff)}</span>`;
     }
     if (status === 'pending') {
       captions += `<span class="cap amber">pendiente</span>`;
@@ -207,6 +245,13 @@ function renderStageCell(cliente, stageKey) {
 function renderE6Cell(cliente) {
   const subType = cliente.e6_sub_type;
   const subDesc = cliente.e6_sub_desc || '';
+  const dias    = cliente.e6_dias;
+
+  let captions = '';
+  if (dias && dias > 0) {
+    const capColor = subType ? (subType === 'e6a' ? 'verde' : 'rojo') : 'muted';
+    captions = `<span class="cap ${capColor}">${dias}d</span>`;
+  }
 
   if (!subType) {
     return `
@@ -215,6 +260,7 @@ function renderE6Cell(cliente) {
           <span class="sub-tag sub-empty"
                 onclick="openE6Picker(event, '${cliente.id}')"
                 style="cursor:pointer;">—</span>
+          ${captions}
         </div>
       </td>
     `;
@@ -229,6 +275,7 @@ function renderE6Cell(cliente) {
           <span class="st-code">${subType.toUpperCase()}</span>
           <span class="st-desc">${esc(subDesc)}</span>
         </span>
+        ${captions}
       </div>
     </td>
   `;
@@ -356,6 +403,19 @@ function openE6Picker(event, clienteId) {
     `;
   });
 
+  // Add days input for E6
+  const currentDias = cliente ? (cliente.e6_dias || '') : '';
+  html += `<div class="sp-sep"></div>`;
+  html += `
+    <div style="padding:6px 10px;display:flex;align-items:center;gap:8px;">
+      <span style="font-family:var(--mono);font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:var(--char);flex-shrink:0;">Días:</span>
+      <input type="number" min="0" max="999" value="${currentDias}"
+             style="width:60px;padding:4px 8px;border:1px solid var(--rule);border-radius:2px;font-family:var(--mono);font-size:11px;background:var(--paper);color:var(--ink-900);outline:none;"
+             onchange="setDias('${clienteId}', 'e6_dias', this.value)"
+             onclick="event.stopPropagation()">
+    </div>
+  `;
+
   $picker.innerHTML = html;
   $picker.classList.add('is-open');
 
@@ -364,7 +424,7 @@ function openE6Picker(event, clienteId) {
   let top  = rect.bottom + 8;
   if (left < 8) left = 8;
   if (left + pickerW > window.innerWidth - 8) left = window.innerWidth - pickerW - 8;
-  if (top + 200 > window.innerHeight) top = rect.top - 200;
+  if (top + 240 > window.innerHeight) top = rect.top - 240;
 
   $picker.style.left = left + 'px';
   $picker.style.top  = top + 'px';
@@ -414,10 +474,26 @@ async function setMonto(clienteId, field, value) {
   const monto = value ? parseFloat(value) : 0;
 
   const cliente = clientes.find(c => c.id === clienteId);
-  if (cliente) cliente[field] = monto;
+  let updates = {};
+  
+  if (cliente) {
+    cliente[field] = monto;
+    
+    // Recalcular diferencia entre E1 y E2
+    const e1 = cliente.e1_monto || 0;
+    const e2 = cliente.e2_monto || 0;
+    cliente.e2_diff = e2 > 0 ? (e2 - e1) : null;
+    
+    updates = {
+      [field]: monto,
+      e2_diff: cliente.e2_diff,
+      updated_at: new Date().toISOString()
+    };
+  }
+  
   renderTable();
 
-  const { error } = await db.from('clientes').update({ [field]: monto, updated_at: new Date().toISOString() }).eq('id', clienteId);
+  const { error } = await db.from('clientes').update(updates).eq('id', clienteId);
   if (error) {
     toast('Error al actualizar monto: ' + error.message, 'error');
     await fetchClientes();
@@ -474,6 +550,15 @@ async function deleteCliente(id) {
 function openAddModal() {
   document.getElementById('modal-title').textContent = 'Nuevo Cliente';
   document.getElementById('client-form').reset();
+  
+  // Limpiar estado de carga de documento
+  const statusText = document.getElementById('doc-status-text');
+  if (statusText) {
+    statusText.className = 'doc-status';
+    statusText.textContent = 'Ningún archivo seleccionado';
+  }
+  
+  populateResponsablesDropdown();
   $modal.classList.add('is-open');
 
   // Focus first input
@@ -489,6 +574,7 @@ async function handleSave() {
   const sector = document.getElementById('f-sector').value;
   const responsable = document.getElementById('f-responsable').value;
   const monto  = parseFloat(document.getElementById('f-monto').value) || 0;
+  const tipo_pago = document.getElementById('f-tipo-pago').value || 'Pago único';
 
   // Validation
   if (!nombre) {
@@ -507,17 +593,18 @@ async function handleSave() {
     sector,
     responsable,
     notas_count: 0,
+    tipo_pago,
     e1_status: monto > 0 ? 'closed' : 'empty',
     e1_monto: monto,
     e2_status: 'empty',
     e2_monto: 0,
     e3_status: 'empty',
-    alta_portal_status: 'empty',
     e4_status: 'empty',
     nda_enviado_status: 'empty',
     nda_firmado_status: 'empty',
     cto_enviado_status: 'empty',
     cto_firmado_status: 'empty',
+    alta_portal_status: 'empty',
   };
 
   closeModal();
@@ -537,6 +624,171 @@ async function handleSave() {
   renderTable();
   toast(`"${nombre}" agregado exitosamente`, 'success');
   updateTimestamp();
+}
+
+// ——— DYNAMIC RESPONSABLES ———
+function populateResponsablesDropdown() {
+  const $select = document.getElementById('f-responsable');
+  if (!$select) return;
+  
+  const dbResponsables = clientes.map(c => c.responsable).filter(r => r && r.trim() !== '');
+  const allResponsables = [...new Set([...defaultResponsables, ...dbResponsables])];
+  
+  const currentValue = $select.value;
+  
+  $select.innerHTML = '<option value="">— Seleccionar —</option>';
+  allResponsables.forEach(r => {
+    const opt = document.createElement('option');
+    opt.value = r;
+    opt.textContent = r;
+    $select.appendChild(opt);
+  });
+  
+  if (currentValue && allResponsables.includes(currentValue)) {
+    $select.value = currentValue;
+  }
+}
+
+function handleAddNewResponsable() {
+  const name = prompt('Ingresa el nombre del nuevo responsable:');
+  if (!name) return;
+  const trimmed = name.trim();
+  if (trimmed === '') return;
+  
+  if (!defaultResponsables.includes(trimmed)) {
+    defaultResponsables.push(trimmed);
+  }
+  
+  populateResponsablesDropdown();
+  document.getElementById('f-responsable').value = trimmed;
+  toast(`Responsable "${trimmed}" agregado`, 'success');
+}
+
+// ——— TOGGLE TIPO PAGO IN TABLE ———
+async function toggleTipoPago(clienteId) {
+  const cliente = clientes.find(c => c.id === clienteId);
+  if (!cliente) return;
+  
+  const nextValue = (cliente.tipo_pago === 'A plazos') ? 'Pago único' : 'A plazos';
+  cliente.tipo_pago = nextValue;
+  renderTable();
+  
+  const { error } = await db.from('clientes').update({ tipo_pago: nextValue, updated_at: new Date().toISOString() }).eq('id', clienteId);
+  if (error) {
+    toast('Error al actualizar tipo de pago: ' + error.message, 'error');
+    await fetchClientes();
+  } else {
+    toast(`Tipo de pago de "${cliente.nombre}" cambiado a "${nextValue}"`, 'success');
+  }
+}
+
+// ——— CLAUDE DOCUMENT PARSER ———
+async function handleDocumentUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const statusText = document.getElementById('doc-status-text');
+  if (statusText) {
+    statusText.className = 'doc-status loading';
+    statusText.textContent = `Leyendo archivo: ${file.name}...`;
+  }
+
+  try {
+    let text = '';
+    const extension = file.name.split('.').pop().toLowerCase();
+
+    if (extension === 'txt') {
+      text = await readTextFile(file);
+    } else if (extension === 'pdf') {
+      text = await readPdfFile(file);
+    } else if (extension === 'docx') {
+      text = await readDocxFile(file);
+    } else {
+      throw new Error('Formato de archivo no soportado. Sube un PDF, DOCX o TXT.');
+    }
+
+    if (statusText) {
+      statusText.textContent = 'Enviando a Claude para análisis...';
+    }
+
+    const response = await fetch('/api/parse-document', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ text })
+    });
+
+    if (!response.ok) {
+      const errData = await response.json();
+      throw new Error(errData.error || 'Error al analizar el documento.');
+    }
+
+    const data = await response.json();
+
+    if (data.nombre) document.getElementById('f-nombre').value = data.nombre;
+    if (data.sector) document.getElementById('f-sector').value = data.sector;
+    
+    if (data.responsable) {
+      const respValue = data.responsable.trim();
+      if (respValue) {
+        if (!defaultResponsables.includes(respValue)) {
+          defaultResponsables.push(respValue);
+          populateResponsablesDropdown();
+        }
+        document.getElementById('f-responsable').value = respValue;
+      }
+    }
+    
+    if (data.monto) document.getElementById('f-monto').value = data.monto;
+    if (data.tipo_pago) document.getElementById('f-tipo-pago').value = data.tipo_pago;
+
+    if (statusText) {
+      statusText.className = 'doc-status success';
+      statusText.textContent = '¡Documento leído! Campos completados con éxito.';
+    }
+    toast('Campos auto-completados por Claude', 'success');
+
+  } catch (err) {
+    console.error(err);
+    if (statusText) {
+      statusText.className = 'doc-status error';
+      statusText.textContent = `Error: ${err.message}`;
+    }
+    toast(`Error al leer archivo: ${err.message}`, 'error');
+  }
+}
+
+function readTextFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target.result);
+    reader.onerror = (err) => reject(err);
+    reader.readAsText(file);
+  });
+}
+
+async function readPdfFile(file) {
+  const arrayBuffer = await file.arrayBuffer();
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+  
+  const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  let fullText = '';
+  
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const textContent = await page.getTextContent();
+    const pageText = textContent.items.map(item => item.str).join(' ');
+    fullText += `\n--- Página ${i} ---\n` + pageText;
+  }
+  
+  return fullText;
+}
+
+async function readDocxFile(file) {
+  const arrayBuffer = await file.arrayBuffer();
+  const result = await window.mammoth.extractRawText({ arrayBuffer });
+  return result.value;
 }
 
 // ——— HELPERS ———

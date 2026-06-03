@@ -52,6 +52,10 @@ CREATE TABLE clientes (
   -- E6A / E6B Sub-estado
   e6_sub_type TEXT DEFAULT NULL,
   e6_sub_desc TEXT DEFAULT NULL,
+  e6_dias INTEGER DEFAULT NULL,
+
+  -- Tipo de Pago
+  tipo_pago TEXT DEFAULT 'Pago único',
 
   -- CTO Firmado
   cto_firmado_status TEXT DEFAULT 'empty',

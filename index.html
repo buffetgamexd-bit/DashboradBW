@@ -9,6 +9,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;900&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
+  <!-- Document Parsers -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 </head>
 <body>
 
@@ -45,7 +48,7 @@
             <th class="resp-col">
               <span class="col-step">Responsable</span>
             </th>
-            <th class="stage">
+             <th class="stage">
               <span class="col-step">E1</span>
               <span class="col-sub">OC Presentada</span>
               <span class="col-sub">✓ Monto</span>
@@ -58,10 +61,6 @@
             <th class="stage">
               <span class="col-step">E3</span>
               <span class="col-sub">Proc. Admin</span>
-            </th>
-            <th class="stage optional">
-              <span class="col-step">Alta en Portal</span>
-              <span class="col-sub">opcional</span>
             </th>
             <th class="stage">
               <span class="col-step">E4</span>
@@ -86,6 +85,10 @@
             <th class="stage">
               <span class="col-step">CTO.</span>
               <span class="col-sub">Firmado</span>
+            </th>
+            <th class="stage optional">
+              <span class="col-step">Alta en Portal</span>
+              <span class="col-sub">opcional</span>
             </th>
           </tr>
         </thead>
@@ -117,6 +120,17 @@
         </div>
 
         <div class="modal-body">
+          <!-- Claude Doc Parser Box -->
+          <div class="doc-upload-box" id="doc-upload-box">
+            <span class="dub-title">¿Tienes un contrato o propuesta?</span>
+            <p class="dub-desc">Sube el archivo (PDF, DOCX o TXT) y Claude completará los campos de abajo automáticamente.</p>
+            <label class="btn-upload">
+              <span>📄 Seleccionar Archivo</span>
+              <input type="file" id="f-document" accept=".pdf,.docx,.txt" style="display:none;">
+            </label>
+            <span id="doc-status-text" class="doc-status">Ningún archivo seleccionado</span>
+          </div>
+
           <form id="client-form" autocomplete="off">
             <div class="form-divider">Información del Cliente</div>
             <div class="form-grid">
@@ -142,14 +156,16 @@
 
               <label>
                 <span class="req">Responsable</span>
-                <select id="f-responsable" required>
-                  <option value="">— Seleccionar —</option>
-                  <option value="MAJA">MAJA</option>
-                  <option value="CHUY">CHUY</option>
-                  <option value="ALONSO">ALONSO</option>
-                  <option value="JESÚS">JESÚS</option>
-                  <option value="CEO">CEO</option>
-                </select>
+                <div class="resp-select-wrap">
+                  <select id="f-responsable" required>
+                    <option value="">— Seleccionar —</option>
+                    <option value="Jesus">Jesus</option>
+                    <option value="Alonso">Alonso</option>
+                    <option value="Johana">Johana</option>
+                    <option value="Marisol">Marisol</option>
+                  </select>
+                  <button type="button" class="btn-add-resp" id="btn-add-resp" title="Agregar nuevo responsable">+</button>
+                </div>
               </label>
             </div>
 
@@ -160,10 +176,11 @@
                 <input type="number" id="f-monto" placeholder="0" min="0" step="1000">
               </label>
               <label>
-                <span>&nbsp;</span>
-                <div style="font-family:var(--mono);font-size:10.5px;color:var(--char);padding:9px 0;letter-spacing:0.04em;">
-                  El monto se puede editar después directamente en la tabla.
-                </div>
+                <span>Tipo de Pago</span>
+                <select id="f-tipo-pago">
+                  <option value="Pago único">Pago único</option>
+                  <option value="A plazos">A plazos</option>
+                </select>
               </label>
             </div>
           </form>
