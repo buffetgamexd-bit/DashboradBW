@@ -1099,9 +1099,9 @@ function handleLogin(e) {
   if (!user) return;
 
   const passwords = {
-    'Jesus': 'jesus123',
-    'Alonso': 'alonso123',
-    'Fabiola': 'fabiola123'
+    'Jesus': 'Js$9VqL2m!',
+    'Alonso': 'Al#4bX8pR@',
+    'Fabiola': 'Fb&7KzW5n*'
   };
 
   if (pass === passwords[user]) {
