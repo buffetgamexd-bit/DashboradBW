@@ -1098,7 +1098,13 @@ function handleLogin(e) {
 
   if (!user) return;
 
-  if (pass === 'legal123') {
+  const passwords = {
+    'Jesus': 'jesus123',
+    'Alonso': 'alonso123',
+    'Fabiola': 'fabiola123'
+  };
+
+  if (pass === passwords[user]) {
     localStorage.setItem('currentUser', user);
     errorMsg.style.display = 'none';
     document.getElementById('login-pass').value = '';
